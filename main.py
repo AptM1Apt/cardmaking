@@ -1,8 +1,5 @@
-from PIL import Image, ImageDraw, ImageFont
-import numpy as nm 
-import pandas as pd 
-import pyphen
-
+import numpy as nm
+import pandas as pd
 import Cards, Sheets, PDF
 
 df = pd.read_csv("test.csv", usecols=["name", "condition", "price", "description", "typeofitem", "typeofdamage", "damage", "usage"], keep_default_na=False).applymap(lambda x: None if x == "" else x)

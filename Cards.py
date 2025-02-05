@@ -1,4 +1,5 @@
 from PIL import Image, ImageDraw, ImageFont
+import os
 import numpy as nm 
 import pandas as pd 
 import pyphen
@@ -49,6 +50,9 @@ def create_card(name, condition, price, description, OUTPUT, typeofitem="Пре�
     def add_comment_prefix(text, prefix="# "):
         return "\n".join(f"{prefix}{line}" for line in text.splitlines())
 #================ВСТРОЕННАЯ ФУНКЦИЯ ДЛЯ ДОБАВЛЕНИЯ СИМВОЛОВ=============================
+    if not os.path.exists(OUTPUT):
+        os.makedirs(OUTPUT)
+    
     output_path = OUTPUT + name + ".png"
 
     img = Image.new("RGB", (CARD_WIDTH, CARD_HEIGHT), BG_COLOR)
@@ -91,7 +95,7 @@ def create_card(name, condition, price, description, OUTPUT, typeofitem="Пре�
     
     pixels = img.load()
 
-    overlay_color = (100, 100, 100, 100)
+    overlay_color = (80, 80, 80, 120)
 
     # Добавляем линии на каждую вторую строку
     for y in range(0, CARD_HEIGHT, 2):
