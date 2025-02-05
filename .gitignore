@@ -1,1 +1,5 @@
 /.venv
+/cards
+/sheets
+/output_sheets
+/TEST.pdf
