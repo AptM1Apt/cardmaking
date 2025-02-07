@@ -1,0 +1,12 @@
+asgiref==3.8.1
+Django==5.1.5
+image==1.5.33
+numpy==2.2.2
+pandas==2.2.3
+pillow==11.1.0
+pyphen==0.17.2
+python-dateutil==2.9.0.post0
+pytz==2025.1
+six==1.17.0
+sqlparse==0.5.3
+tzdata==2025.1

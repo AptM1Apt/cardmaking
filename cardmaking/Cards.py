@@ -1,6 +1,6 @@
 from PIL import Image, ImageDraw, ImageFont
 import os
-import numpy as nm 
+import numpy as np
 import pandas as pd 
 import pyphen
 
@@ -59,7 +59,7 @@ def create_card(name, condition, price, description, OUTPUT, typeofitem="Пре�
     draw = ImageDraw.Draw(img)
     
     try:
-        font = ImageFont.truetype("claccon.ttf", 24)  # Обычный шрифт
+        font = ImageFont.truetype("assets\\claccon.ttf", 24)  # Обычный шрифт
     except IOError:
         font = ImageFont.load_default()  # Запасной вариант
     draw.rectangle(xy=(0, 0, CARD_WIDTH, OUT * 3), fill=BG_COLOR2)    
