@@ -4,40 +4,52 @@ import numpy as np
 import pandas as pd 
 import pyphen
 
+class item: 
+        def __init__(self,
+                    name, 
+                    condition, 
+                    price, 
+                    description, 
+                    typeofitem="Предмет", 
+                    typeofdamage=None, 
+                    damage=None, 
+                    usage=None):                    
+            self.name = name
+            self.condition = condition
+            self.price = price
+            self.description = description
+            self.output = "output\\cards\\" + name + ".png"
+            self.typeofitem = typeofitem
+            self.typeofdamage = typeofdamage
+            self.damage = damage
+            self.usage = usage 
+
 class card:
     CARD_WIDTH, CARD_HEIGHT = 500, 300  
     W = 5
     OUT = 20
 
-    def __init__(self, 
-                 name, 
-                 condition, 
-                 price, 
-                 description, 
-                 typeofitem="Предмет", 
-                 typeofdamage=None, 
-                 damage=None, 
-                 usage=None, 
-                 BG_COLOR=(255,255,255), 
-                 BG_COLOR2=(200,200,200), 
-                 TEXT_COLOR=(0,0,0)):
+    def __init__(self,
+                name, 
+                condition, 
+                price, 
+                description,    
+                typeofitem="Предмет", 
+                typeofdamage=None, 
+                damage=None, 
+                usage=None,
+                BG_COLOR=(255,255,255), 
+                BG_COLOR2=(200,200,200), 
+                TEXT_COLOR=(0,0,0)):
         
         if not os.path.exists("output\\cards"):
             os.makedirs("output\\cards")
         
-        self.name = name
-        self.condition = condition
-        self.price = price
-        self.description = description
-        self.output = "output\\cards\\" + name + ".png"
-        self.typeofitem = typeofitem
-        self.typeofdamage = typeofdamage
-        self.damage = damage
-        self.usage = usage 
+        self.ITEM = item(name, condition, price, description, typeofitem, typeofdamage, damage, usage)
         self.BG_COLOR = BG_COLOR
         self.BG_COLOR2 = BG_COLOR2
         self.TEXT_COLOR = TEXT_COLOR
-        self.cardimage = self.create_card()
+        self.cardimage = self.create_card(item)
 
     def create_card(self):    
         def wrap_text(text: str, max_length: int, q=0) -> str:
