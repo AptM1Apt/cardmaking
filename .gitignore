@@ -1,5 +1,4 @@
-/.venv
-/output
-/test_data
-/__pycache__
-/cardmaking/__pycache__
+.venv/
+output/
+test_data/
+__pycache__/
