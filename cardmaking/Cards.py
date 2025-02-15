@@ -1,153 +1,135 @@
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-import os
-import numpy as np
-import pandas as pd 
 import pyphen
+from pydantic import BaseModel, PositiveInt 
+from pydantic_extra_types.color import ColorTuple
+import logging
 
-class item: 
-        def __init__(self,
-                    name, 
-                    condition, 
-                    price, 
-                    description, 
-                    typeofitem="Предмет", 
-                    typeofdamage=None, 
-                    damage=None, 
-                    usage=None):                    
-            self.name = name
-            self.condition = condition
-            self.price = price
-            self.description = description
-            self.output = "output\\cards\\" + name + ".png"
-            self.typeofitem = typeofitem
-            self.typeofdamage = typeofdamage
-            self.damage = damage
-            self.usage = usage 
 
-class card:
-    CARD_WIDTH, CARD_HEIGHT = 500, 300  
-    W = 5
-    OUT = 20
+class Item(BaseModel):
+    name: str
+    condition: int # from 1 to 12 TODO: Добавить ограничение.
+    price: PositiveInt
+    description: str
+    type_of_item: str = "Предмет"
+    type_of_damage: str | None
+    damage_dice: str | None # Куб урона. TODO: Подумать над преобразованием в класс.
+    usage: int # Заряд оружия
 
-    def __init__(self,
-                name, 
-                condition, 
-                price, 
-                description,    
-                typeofitem="Предмет", 
-                typeofdamage=None, 
-                damage=None, 
-                usage=None,
-                BG_COLOR=(255,255,255), 
-                BG_COLOR2=(200,200,200), 
-                TEXT_COLOR=(0,0,0)):
+class ItemCardGenerator(BaseModel):
+    _width: PositiveInt = 500
+    _height: PositiveInt = 300  
+    _margin = 5 # Типа Padding, но не падингтон
+    _padding = 20
+    _bg_primary_color: ColorTuple = (255, 255, 255)
+    _bg_secondary_color: ColorTuple = (200, 200, 200)
+    _text_color: ColorTuple = (0,0,0)
+    _font_path: str = Path("/") / "assets" / "claccon.ttf"
+    _header_max_length: int = 21
+    _overlay_color: ColorTuple = (80, 80, 80, 120)
+    output: Path = Path("/") / "output" / "cards"      
+
+    def _wrap_text(text: str, max_length: int, is_header: bool = 0) -> str:
+        length_coef = 2.4
+        dic = pyphen.Pyphen(lang='ru')
+        words = text.split()
+        result = [] # каждый элемент - отдельная строка
+        line = "" 
+
+        # Почему нам нужно выходить за максимальную длину, а не укладываться в неё?
+        if is_header and len(words) <= 2 and len(text) > max_length: # Загловок влезает в ограничения
+            return "\n".join(words)  
         
-        if not os.path.exists("output\\cards"):
-            os.makedirs("output\\cards")
-        
-        self.ITEM = item(name, condition, price, description, typeofitem, typeofdamage, damage, usage)
-        self.BG_COLOR = BG_COLOR
-        self.BG_COLOR2 = BG_COLOR2
-        self.TEXT_COLOR = TEXT_COLOR
-        self.cardimage = self.create_card(item)
+        for word in words:
+            if len(line) + len(word) + 1 < max_length: # Хватает места для слова
+                line += word + " "
+                continue
 
-    def create_card(self):    
-        def wrap_text(text: str, max_length: int, q=0) -> str:
-            dic = pyphen.Pyphen(lang='ru')
-            words = text.split()
-            result = []
-            line = ""
-            
-            if q == 1 and len(words) == 2 and len(text) > max_length:
-                return "\n".join(words)  # Просто переносим слова без обработки
-            
-            for word in words:
-                if len(line) + len(word) + 1 > max_length:
-                    if len(result) == 1 and q == 1:  # Если уже есть одна строка, переносим остаток во вторую и выходим
-                        break
-                    if len(word) > max_length / 2.4:  # Разбиваем длинное слово
-                        parts = dic.wrap(word, max_length - len(line))
-                        if parts:
-                            line += parts[0]
-                            result.append(line.rstrip())
-                            line = parts[1] + " "
-                        else:
-                            result.append(line.rstrip())
-                            line = word + " "
-                    else:
-                        result.append(line.rstrip())
-                        line = word + " "
-                else:
-                    line += word + " "
-            
-            result.append(line.rstrip())  # Добавляем последнюю строку
-            
-            return "\n".join(result)
+            if len(result) == 1 and is_header:  # Уже есть одна строка заголовка
+                break
 
-        def add_comment_prefix(text, prefix="# "):
-            return "\n".join(f"{prefix}{line}" for line in text.splitlines())
+            if len(word) < max_length / length_coef:  # Считаем, что слово не переносится?
+                result.append(line) # r.strip()
+                line = word + " "
+                continue
 
-        img = Image.new("RGB", (self.CARD_WIDTH, self.CARD_HEIGHT), self.BG_COLOR)
+            avaiable_length = max_length - len(line)
+
+            parts = dic.wrap(word, avaiable_length)
+            if parts: # Слово переносится
+                line += parts[0]
+                result.append(line) # r.strip()
+                line = parts[1] + " "
+            else: # Слово НЕ переносится
+                result.append(line) # r.strip()
+                line = word + " "
+            
+        result.append(line.rstrip())  
+        return "\n".join(result)
+    
+    def _add_comment_prefix(text, prefix="# "):
+        return "\n".join(f"{prefix}{line}" for line in text.splitlines())
+
+    def create_image(self, item: Item) -> Image:    
+        img = Image.new("RGB", (self._width, self._height), self._bg_primary_color)
         draw = ImageDraw.Draw(img)
-        
         try:
-            font = ImageFont.truetype("assets\\claccon.ttf", 24)  # Обычный шрифт
+            font = ImageFont.truetype(self._font_path, 24)  # Обычный шрифт
         except IOError:
+            logging.WARNING("не получилось загрузить шрифт по пути", self._font_path)
             font = ImageFont.load_default()  # Запасной вариант
-        draw.rectangle(xy=(0, 0, self.CARD_WIDTH, self.OUT * 3), fill=self.BG_COLOR2)    
-        draw.line(xy=(0,self.OUT * 3, self.CARD_WIDTH, self.OUT * 3), fill=self.TEXT_COLOR, width=5)
 
-        #INNER BORDER
-        if (self.damage != None and type != None):
-            draw.rectangle(xy=(0, self.CARD_HEIGHT - self.OUT * 2, self.CARD_WIDTH, self.CARD_HEIGHT), fill=self.BG_COLOR2)
-            draw.line(xy=(0,self.CARD_HEIGHT - self.OUT * 2, self.CARD_WIDTH, self.CARD_HEIGHT - self.OUT * 2), fill=self.TEXT_COLOR, width=5)
-        
+        draw.rectangle(xy=(0, 0, self._width, self._padding * 3),
+                        fill=self._bg_secondary_color) # Фон заголовка    
+        draw.line(xy=(0,self._padding * 3, self._width, self._padding * 3),
+                   fill=self._text_color, width=5) # Разделительная линия
+
         #BORDER
-        draw.rectangle(xy=(0,0,self.W,self.CARD_HEIGHT), fill=self.TEXT_COLOR)
-        draw.rectangle(xy=(0,0,self.CARD_WIDTH,self.W), fill=self.TEXT_COLOR)
-        draw.rectangle(xy=(self.CARD_WIDTH-self.W,0,self.CARD_WIDTH,self.CARD_HEIGHT), fill=self.TEXT_COLOR)
-        draw.rectangle(xy=(0,self.CARD_HEIGHT-self.W,self.CARD_WIDTH,self.CARD_HEIGHT), fill=self.TEXT_COLOR)
+        draw.rectangle(xy=(0,0,self._margin,self._height), fill=self._text_color)
+        draw.rectangle(xy=(0,0,self._text_color,self._margin), fill=self._text_color)
+        draw.rectangle(xy=(self._width-self._margin,0,self._width,self._height),
+                        fill=self._text_color)
+        draw.rectangle(xy=(0,self._height-self._margin,self._width,self._height),
+                        fill=self._text_color)
 
         #NAME
-        fortext = r"{}".format(add_comment_prefix(wrap_text(self.name, 21, 1)))
-        if fortext.count(chr(10)) > 0: 
-            draw.text((self.OUT + self.W, self.OUT * 0.75), f"{fortext}" , font=font, fill=self.TEXT_COLOR)
+        fortext = r"{}".format(
+            self._add_comment_prefix(
+            self._wrap_text(self.name, self._header_max_length, True)))
+        if fortext.count('\n') > 0: 
+            draw.text((self._padding + self._margin, self._padding * 0.75), f"{fortext}",
+                       font=font, fill=self._text_color)
         else:
-            draw.text((self.OUT + self.W, self.OUT + self.W), f"{fortext}" , font=font, fill=self.TEXT_COLOR)
+            draw.text((self._padding + self._margin, self._padding + self._margin), f"{fortext}",
+                       font=font, fill=self._text_color)
+
         #PRICE
-        draw.text((self.CARD_WIDTH - self.OUT * 8, self.OUT + self.W), f"G0: {self.price}", font=font, fill=self.TEXT_COLOR)
+        draw.text((self._width - self._padding * 8, self._padding + self._margin),
+                   f"G0: {self.price}", font=font, fill=self._text_color)
         #DESCRIPTION
-        draw.multiline_text((self.OUT + self.W, 3.5 * self.OUT), f"ТИП: {self.typeofitem}\nОПИСАНИЕ = \'\'\'\n{wrap_text(self.description,36)}\n\'\'\'\n# Макс. Состояние: {self.condition}\n# Тек. Состояние: ___", font=font, fill=self.TEXT_COLOR, spacing=9)
+        draw.multiline_text((self._padding + self._margin, 3.5 * self._padding),
+                             f"ТИП: {self.typeofitem}\nОПИСАНИЕ = \'\'\'\n{self._wrap_text(item.description,36)}\n \
+                                \'\'\'\n# Макс. Состояние: {item.condition}\n# Тек. Состояние: ___",
+                                  font=font, fill=self._text_color, spacing=9)
         
-        #DAMAGE AND ALL STUFF
-        if (self.damage!=None and type!=None):
-            draw.text((self.OUT+self.W, self.CARD_HEIGHT - self.OUT - 1.5 * self.W), f"# {self.typeofdamage}:{self.damage}", font=font, fill=self.TEXT_COLOR)
-        if (self.usage!=None):
-            draw.text((self.CARD_WIDTH - self.OUT * 8, self.CARD_HEIGHT - self.OUT - 1.5 * self.W), f"Исп:{self.usage}", font=font, fill=self.TEXT_COLOR)
+        #INNER BORDER 
+        # Если карточка оружия 
+        if (item.damage_dice != None):
+            draw.rectangle(xy=(0, self._height - self._padding * 2, self._width, self._height), fill=self._bg_secondary_color)
+            draw.line(xy=(0,self._height - self._padding * 2, self._width, self._height - self._padding * 2), fill=self._text_color, width=5)
+            draw.text((self._padding+self._margin, self._height - self._padding - 1.5 * self._margin), f"# {item.type_of_damage}:{item.damage_dice}", font=font, fill=self._text_color)
+            if (item.usage!=None):
+                draw.text((self._width - self._padding * 8, self._height - self._padding - 1.5 * self._margin), f"Исп:{item.usage}", font=font, fill=self._text_color)
         
-        pixels = img.load()
 
-        overlay_color = (80, 80, 80, 120)
+        pixels = img.load() # TODO: Нужна ли это строка?
 
-        # Добавляем линии на каждую вторую строку
-        for y in range(0, self.CARD_HEIGHT, 2):
-            for x in range(self.CARD_WIDTH):
+        # Добавляем линии на каждую вторую строку # TODO: Реализовать наложением фильтра
+        for y in range(0, self._height, 2):
+            for x in range(self._width):
                 pixels[x, y] = tuple(
-                    (p + c) // 2 for p, c in zip(pixels[x, y], overlay_color)
+                    (p + c) // 2 for p, c in zip(pixels[x, y], self._overlay_color)
                 )
 
         return img
 
-    def save_card(self):
-        (self.cardimage).save(self.output)
-
-
-def create_cards_CSV(df: pd.DataFrame):
-    cards = []
-    for i in range(len(df)):
-        name, condition, price, description, typeofitem, typeofdamage, damage, usage = df.iloc[i]
-        item = card(name, condition, price, description, typeofitem, typeofdamage, damage, usage)
-        cards.append(item)
-    
-    cards.sort(key=lambda card: card.typeofitem)
-    return cards
