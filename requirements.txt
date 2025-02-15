@@ -1,5 +1,4 @@
 asgiref==3.8.1
-Django==5.1.5
 image==1.5.33
 numpy==2.2.2
 pandas==2.2.3
